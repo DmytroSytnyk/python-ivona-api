@@ -18,6 +18,7 @@ class IvonaAPI:
     support for lexicon actions.
     """
     ALLOWED_CODECS = ['ogg', 'mp3', 'mp4']
+    ALLOWED_SPEECH_MARKS = ['Sentence', 'SSML', 'Viseme', 'Word']
 
     @property
     def region(self):
@@ -39,8 +40,20 @@ class IvonaAPI:
             raise ValueError("Incorrect codec - only ogg, mp3 and mp4 allowed.")
         self._codec = value
 
+    @property
+    def speech_marks(self):
+        return self._speech_marks
+
+    @speech_marks.setter
+    def speech_marks(self, value):
+        if value is None: 
+            self._speech_marks = []
+        elif not all([m in self.ALLOWED_SPEECH_MARKS for m in value]):
+                raise ValueError("Incorrect speech mark specification  - only a list of 'Sentence', 'SSML', 'Viseme' and 'Word' allowed.")
+        self._speech_marks = value
+
     def __init__(self, access_key, secret_key, voice_name='Salli',
-                 language='en-US', codec='mp3', region='eu-west-1'):
+                 language='en-US', codec='mp3', speech_marks=[], region='eu-west-1'):
         self.region = region
         self._aws4auth = AWS4Auth(access_key, secret_key, region, 'tts')
 
@@ -48,7 +61,8 @@ class IvonaAPI:
         self.set_voice(voice_name, language)
 
         self.codec = codec.lower()
-
+        
+        self.speech_marks = speech_marks
         # Below are listed additional parameters that have default values,
         # but are initialized here so that they can be changed on instance
         # basis if need be
@@ -125,6 +139,9 @@ class IvonaAPI:
             },
             'OutputFormat': {
                 'Codec': self.codec.upper(),
+            
+                'SpeechMarks': {m: m in self.speech_marks and self.codec.upper() in ['MP4', 'SPEECHMARK'] 
+                                for m in self.ALLOWED_SPEECH_MARKS}
             },
             'Parameters': {
                 'Rate': self.rate,
@@ -137,7 +154,7 @@ class IvonaAPI:
                 'Language': language,
             },
         }
-
+        
         r = requests.post(endpoint, auth=self._aws4auth, json=data)
 
         if 'x-amzn-ErrorType' in r.headers:
